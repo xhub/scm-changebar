@@ -83,26 +83,44 @@ def putChangebar(filename, argv, listL):
             stderr=subprocess.PIPE)
     diff = gitDiff.stdout
     allLines = f.readlines()
+    totalLines = len(allLines)
     for l in diff.readlines():
         changes = re.match(r"^@@ -[0-9,]* \+([0-9,]*) @@", l)
-        if changes:
-            [start, length] = changes.group(1).split(',')
-            # changes in diff have 3 lines of context before and after
-            start = int(start) + 3
-            end = start+int(length)-6
-            tmpL1 = [i for i in listL if i[0] <= start and i[1] >= start]
-            tmpL2 = [i for i in listL if i[0] <= end and i[1] >= end]
-            if tmpL1:
-                lStart = min(tmpL1, key=lambda x: x[0])[0]-1
-            else:
-                lStart = start-1
-            if tmpL2:
-                lEnd = max(tmpL2, key=lambda x: x[1])[1]
-            else:
-                lEnd = end
+        if not changes:
+            continue
+        [startS, lengthS] = changes.group(1).split(',')
+        # changes in diff have 3 lines of context before and after
+        start = int(startS)
+        length = int(lengthS)
+        if start == 1:
+            # We are at the beginning of the file
+            # XXX this will not work if the number of line is less than 7 !
+            start = start + length - 4
+            beginningFile = True
+        else:
+            start = start + 3
+            beginningFile = False
+        if start + length - 6 >= totalLines:
+            # We are at the end of the file
+            end = totalLines
+            allLines[end] = ''
+        elif beginningFile:
+            end = start + length - 3
+        else:
+            end = start + length - 6
+        tmpL1 = [i for i in listL if i[0] <= start and i[1] >= start]
+        tmpL2 = [i for i in listL if i[0] <= end and i[1] >= end]
+        if tmpL1:
+            lStart = min(tmpL1, key=lambda x: x[0])[0]-1
+        else:
+            lStart = start-1
+        if tmpL2:
+            lEnd = max(tmpL2, key=lambda x: x[1])[1]
+        else:
+            lEnd = end
 
-            allLines[lStart] = '\cbstart{} ' + allLines[lStart]
-            allLines[lEnd] = '\cbend{} ' + allLines[lEnd]
+        allLines[lStart] = '\cbstart{} ' + allLines[lStart]
+        allLines[lEnd] = '\cbend{} ' + allLines[lEnd]
 
     output.writelines(allLines)
     f.close()
